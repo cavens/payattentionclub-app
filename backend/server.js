@@ -61,46 +61,32 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
-// Confirm PaymentIntent with Apple Pay token
+// Confirm PaymentIntent with PaymentMethod ID (from Apple Pay or other)
 app.post('/api/confirm-payment-intent', async (req, res) => {
   try {
-    const { client_secret, payment_data } = req.body;
+    const { client_secret, payment_method_id } = req.body;
     
-    if (!client_secret || !payment_data) {
-      return res.status(400).json({ error: 'client_secret and payment_data are required' });
+    if (!client_secret || !payment_method_id) {
+      return res.status(400).json({ error: 'client_secret and payment_method_id are required' });
     }
-    
-    // Decode base64 payment data (Apple Pay token format)
-    const paymentDataBuffer = Buffer.from(payment_data, 'base64');
-    const paymentData = JSON.parse(paymentDataBuffer.toString());
     
     // Retrieve the PaymentIntent
     const paymentIntentId = client_secret.split('_secret_')[0];
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
-    // Apple Pay provides encrypted token - Stripe needs payment method
-    // We'll create a PaymentMethod using Stripe's Apple Pay token
-    // Note: In production, you'd use Stripe's iOS SDK to convert PKPayment to PaymentMethod
-    // For now, we'll use a simplified approach: create payment method from token
-    
-    // Create PaymentMethod from Apple Pay payment data
-    // Stripe expects the token in a specific format from Apple Pay
-    const paymentMethod = await stripe.paymentMethods.create({
-      type: 'card',
-      card: {
-        token: paymentData.id || paymentData.token // Apple Pay token identifier
-      }
-    });
-    
-    // Confirm the PaymentIntent with the payment method
+    // Confirm the PaymentIntent with the PaymentMethod
+    // The PaymentMethod was created on the client side using Stripe SDK
     const confirmedIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
-      payment_method: paymentMethod.id
+      payment_method: payment_method_id
     });
     
     console.log(`PaymentIntent confirmed: ${confirmedIntent.id}, status: ${confirmedIntent.status}`);
     
+    // Check if confirmation was successful (status should be 'requires_capture' for manual capture)
+    const success = confirmedIntent.status === 'requires_capture' || confirmedIntent.status === 'succeeded';
+    
     res.json({
-      success: true,
+      success: success,
       payment_intent_id: confirmedIntent.id,
       status: confirmedIntent.status
     });
@@ -126,12 +112,14 @@ app.post('/api/capture-payment-intent', async (req, res) => {
       ? { amount_to_capture: amount_to_capture }
       : {}; // Capture full amount if not specified
     
+    console.log(`Capturing PaymentIntent ${payment_intent_id} for $${(amount_to_capture || 0) / 100}`);
+    
     const paymentIntent = await stripe.paymentIntents.capture(
       payment_intent_id,
       captureOptions
     );
     
-    console.log(`PaymentIntent captured: ${paymentIntent.id}`);
+    console.log(`✅ PaymentIntent captured: ${paymentIntent.id}, amount: $${(paymentIntent.amount_captured / 100).toFixed(2)}`);
     
     res.json({
       success: true,
