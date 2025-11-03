@@ -1,0 +1,30 @@
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+
+# Backend
+backend/node_modules/
+backend/.env
+backend/.env.local
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
